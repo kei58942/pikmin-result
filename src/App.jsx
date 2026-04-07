@@ -8,6 +8,8 @@ import PikminGuide from './components/PikminGuide';
 import TeamVision from './components/TeamVision';
 import { useClickEffect } from './components/ClickEffect';
 import DailyBriefing from './components/DailyBriefing';
+import WeatherOverlay from './components/WeatherOverlay';
+import EnergyTank from './components/EnergyTank';
 import { useGitHubApi } from './hooks/useGitHubApi';
 import { useSharedData } from './hooks/useSharedData';
 
@@ -60,6 +62,7 @@ function App() {
 
   const [activeTab, setActiveTab] = useState('score');
   const [showSettings, setShowSettings] = useState(false);
+  const [weather, setWeather] = useState(null);
   const timeTheme = getTimeTheme();
   const isNight = timeTheme.label.includes('夜');
 
@@ -73,6 +76,7 @@ function App() {
   return (
     <div className={`min-h-screen bg-gradient-to-br ${timeTheme.bg} transition-colors duration-1000`}>
       <DailyBriefing />
+      <WeatherOverlay onWeatherLoad={setWeather} />
       <EffectLayer />
 
       {/* ヘッダー */}
@@ -91,8 +95,10 @@ function App() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* エネルギータンク */}
+              <EnergyTank memberCount={members.length} weather={weather} />
               {/* 時間帯ラベル */}
-              <div className={`px-2 py-1 rounded-full text-[10px] font-medium ${isNight ? 'bg-slate-700 text-slate-200' : 'bg-amber-50 text-amber-700'}`}>
+              <div className={`hidden sm:block px-2 py-1 rounded-full text-[10px] font-medium ${isNight ? 'bg-slate-700 text-slate-200' : 'bg-amber-50 text-amber-700'}`}>
                 {timeTheme.label}
               </div>
               {/* 同期ステータスインジケーター */}
