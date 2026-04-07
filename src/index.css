@@ -10,6 +10,23 @@
   --color-garden-start: #e8f5e9;
   --color-garden-mid: #f1f8e9;
   --color-garden-end: #fffde7;
+
+  /* 朝 (6-11) */
+  --color-morning-start: #e8f5e9;
+  --color-morning-mid: #f1f8e9;
+  --color-morning-end: #fffde7;
+  /* 昼 (11-16) */
+  --color-noon-start: #e3f2fd;
+  --color-noon-mid: #f1f8e9;
+  --color-noon-end: #fff8e1;
+  /* 夕方 (16-19) */
+  --color-evening-start: #fff3e0;
+  --color-evening-mid: #ffe0b2;
+  --color-evening-end: #ffccbc;
+  /* 夜 (19-6) */
+  --color-night-start: #263238;
+  --color-night-mid: #1a237e;
+  --color-night-end: #0d1b2a;
 }
 
 body {

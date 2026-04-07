@@ -16,6 +16,34 @@ const TABS = [
   { id: 'cases', label: '好事例', icon: BookOpen },
 ];
 
+function getTimeTheme() {
+  const h = new Date().getHours();
+  if (h >= 6 && h < 11) return {
+    bg: 'from-morning-start via-morning-mid to-morning-end',
+    header: 'bg-white/70 border-green-200/50',
+    label: '🌅 朝の森',
+    textClass: '',
+  };
+  if (h >= 11 && h < 16) return {
+    bg: 'from-noon-start via-noon-mid to-noon-end',
+    header: 'bg-white/70 border-blue-200/50',
+    label: '☀️ 昼の草原',
+    textClass: '',
+  };
+  if (h >= 16 && h < 19) return {
+    bg: 'from-evening-start via-evening-mid to-evening-end',
+    header: 'bg-orange-50/70 border-orange-200/50',
+    label: '🌇 夕焼けの丘',
+    textClass: '',
+  };
+  return {
+    bg: 'from-night-start via-night-mid to-night-end',
+    header: 'bg-slate-900/70 border-slate-700/50',
+    label: '🌙 夜の探索',
+    textClass: 'text-white',
+  };
+}
+
 function App() {
   const gitHubApi = useGitHubApi();
   const {
@@ -31,6 +59,8 @@ function App() {
 
   const [activeTab, setActiveTab] = useState('score');
   const [showSettings, setShowSettings] = useState(false);
+  const timeTheme = getTimeTheme();
+  const isNight = timeTheme.label.includes('夜');
 
   // GitHub接続時にデータ取得
   useEffect(() => {
@@ -40,11 +70,11 @@ function App() {
   }, [gitHubApi.isConfigured]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-garden-start via-garden-mid to-garden-end">
+    <div className={`min-h-screen bg-gradient-to-br ${timeTheme.bg} transition-colors duration-1000`}>
       <EffectLayer />
 
       {/* ヘッダー */}
-      <header className="sticky top-0 z-10 backdrop-blur-md bg-white/70 border-b border-green-200/50">
+      <header className={`sticky top-0 z-10 backdrop-blur-md ${timeTheme.header}`}>
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -52,13 +82,17 @@ function App() {
                 <Rocket className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-gray-800 leading-tight">
+                <h1 className={`text-lg font-bold leading-tight ${isNight ? 'text-white' : 'text-gray-800'}`}>
                   {settings.dashboardTitle}
                 </h1>
-                <p className="text-[11px] text-gray-500">{settings.dashboardSubtitle}</p>
+                <p className={`text-[11px] ${isNight ? 'text-slate-300' : 'text-gray-500'}`}>{settings.dashboardSubtitle}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* 時間帯ラベル */}
+              <div className={`px-2 py-1 rounded-full text-[10px] font-medium ${isNight ? 'bg-slate-700 text-slate-200' : 'bg-amber-50 text-amber-700'}`}>
+                {timeTheme.label}
+              </div>
               {/* 同期ステータスインジケーター */}
               {gitHubApi.isConfigured && (
                 <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${
@@ -109,10 +143,10 @@ function App() {
         <PikminGuide />
 
         <div className="flex items-center justify-between mb-6">
-          <p className="text-sm text-gray-600">
-            <span className="font-bold text-gray-800">{members.length}</span> 名の隊員
+          <p className={`text-sm ${isNight ? 'text-slate-300' : 'text-gray-600'}`}>
+            <span className={`font-bold ${isNight ? 'text-white' : 'text-gray-800'}`}>{members.length}</span> 名の隊員
           </p>
-          <div className="flex gap-4 text-xs text-gray-500">
+          <div className={`flex gap-4 text-xs ${isNight ? 'text-slate-400' : 'text-gray-500'}`}>
             <span className="flex items-center gap-1">
               <span className="w-2.5 h-2.5 rounded-full bg-pikmin-red" /> 情熱
             </span>
@@ -169,7 +203,7 @@ function App() {
         )}
       </main>
 
-      <footer className="text-center py-6 text-xs text-gray-400">
+      <footer className={`text-center py-6 text-xs ${isNight ? 'text-slate-500' : 'text-gray-400'}`}>
         {settings.dashboardTitle} — IS応対品質可視化ツール
       </footer>
 

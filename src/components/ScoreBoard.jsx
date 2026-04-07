@@ -1,4 +1,13 @@
-import { Flame, Ear, Droplets, User } from 'lucide-react';
+import { Flame, Ear, Droplets } from 'lucide-react';
+
+// ポイントに応じた隊員ステータス
+function getPikminStatus(total) {
+  if (total >= 15) return { emoji: '🌺', label: '満開', ring: 'ring-pink-400', bg: 'bg-gradient-to-br from-pink-100 to-rose-200' };
+  if (total >= 10) return { emoji: '🌸', label: '開花', ring: 'ring-pink-300', bg: 'bg-gradient-to-br from-pink-50 to-rose-100' };
+  if (total >= 5)  return { emoji: '🌷', label: 'つぼみ', ring: 'ring-yellow-300', bg: 'bg-gradient-to-br from-yellow-50 to-amber-100' };
+  if (total >= 1)  return { emoji: '🌱', label: '葉っぱ', ring: 'ring-green-300', bg: 'bg-gradient-to-br from-green-50 to-emerald-100' };
+  return { emoji: '🫘', label: '種', ring: 'ring-gray-200', bg: 'bg-gray-100' };
+}
 
 const PIKMIN_BUTTONS = [
   {
@@ -31,16 +40,20 @@ const PIKMIN_BUTTONS = [
 ];
 
 function ScoreCard({ member, score, total, onAddPoint, onRemovePoint, onClickEffect }) {
+  const status = getPikminStatus(total);
   return (
     <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
       {/* ヘッダー */}
       <div className="flex items-center gap-3 px-6 pt-5 pb-3">
-        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-          <User className="w-5 h-5 text-green-600" />
+        <div className={`w-11 h-11 rounded-full ${status.bg} ring-2 ${status.ring} flex items-center justify-center text-xl transition-all duration-500`}>
+          {status.emoji}
         </div>
         <div className="flex-1">
           <h3 className="font-bold text-gray-800">{member.name}</h3>
-          <p className="text-xs text-gray-400">合計: {total} pt</p>
+          <p className="text-xs text-gray-400">
+            合計: {total} pt
+            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">{status.label}</span>
+          </p>
         </div>
       </div>
 
