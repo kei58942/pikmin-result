@@ -7,6 +7,7 @@ import SettingsPanel from './components/SettingsPanel';
 import PikminGuide from './components/PikminGuide';
 import TeamVision from './components/TeamVision';
 import { useClickEffect } from './components/ClickEffect';
+import DailyBriefing from './components/DailyBriefing';
 import { useGitHubApi } from './hooks/useGitHubApi';
 import { useSharedData } from './hooks/useSharedData';
 
@@ -71,6 +72,7 @@ function App() {
 
   return (
     <div className={`min-h-screen bg-gradient-to-br ${timeTheme.bg} transition-colors duration-1000`}>
+      <DailyBriefing />
       <EffectLayer />
 
       {/* ヘッダー */}
