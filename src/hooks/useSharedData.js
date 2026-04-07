@@ -17,15 +17,16 @@ function getMonthStr() {
 
 const DEFAULT_DATA = {
   settings: {
-    dashboardTitle: 'Pikmin 3 Result Dashboard',
+    dashboardTitle: 'ピクミン ダッシュボード',
     dashboardSubtitle: "今日の調査報告 — Today's Report",
   },
   members: [
-    { id: 'member-1', name: '隊員A' },
-    { id: 'member-2', name: '隊員B' },
-    { id: 'member-3', name: '隊員C' },
+    { id: 'member-kaneko', name: '金児胤栄' },
+    { id: 'member-yamazaki', name: '山崎紀史' },
+    { id: 'member-ibaraki', name: '茨陸翔' },
+    { id: 'member-yoshimasu', name: '吉増海斗' },
+    { id: 'member-furuta', name: '古田大貴' },
   ],
-  // scores: { "2026-04-06": { "member-1": { red: 3, yellow: 1, blue: 2 } } }
   scores: {},
   cases: [],
 };
