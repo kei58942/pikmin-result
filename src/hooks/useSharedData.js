@@ -91,26 +91,29 @@ export function useSharedData() {
       const remote = await fetchRemote();
       if (!active) return;
 
-      if (remote && remote.members) {
-        setSyncStatus('synced');
-
-        // 自分の書き込み直後は上書きスキップ（300ms猶予）
-        if (Date.now() - lastWriteTs.current < 500) return;
-
-        const merged = { ...DEFAULT_DATA, ...remote };
-        // 配列がオブジェクトになった場合の安全策
-        if (remote.cases && !Array.isArray(remote.cases)) {
-          merged.cases = Object.values(remote.cases);
-        }
-        if (remote.members && !Array.isArray(remote.members)) {
-          merged.members = Object.values(remote.members);
-        }
-
-        setData(merged);
-        saveLocal(merged);
-      } else {
-        setSyncStatus(remote === null ? 'error' : 'synced');
+      if (remote === null) {
+        setSyncStatus('error');
+        return;
       }
+
+      setSyncStatus('synced');
+
+      // メンバーデータが無い or 文字化け → ローカルデータで上書き修復
+      if (!remote.members || !Array.isArray(remote.members) || remote.members.length === 0) {
+        writeRemote(dataRef.current);
+        return;
+      }
+
+      // 自分の書き込み直後は上書きスキップ
+      if (Date.now() - lastWriteTs.current < 500) return;
+
+      const merged = { ...DEFAULT_DATA, ...remote };
+      if (remote.cases && !Array.isArray(remote.cases)) {
+        merged.cases = Object.values(remote.cases);
+      }
+
+      setData(merged);
+      saveLocal(merged);
     };
 
     // 初回即時取得
