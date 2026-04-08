@@ -57,6 +57,7 @@ function App() {
     getDailyRanking, getMonthlyRanking, todayStr, monthStr,
     cases, addCase, removeCase, getMethodStats, getMemberStats,
     syncStatus, hasToken, token, updateToken,
+    energyCount,
   } = useSharedData();
 
   const { spawnEffect, EffectLayer } = useClickEffect();
@@ -92,7 +93,7 @@ function App() {
             </div>
             <div className="flex items-center gap-2">
               {/* エネルギータンク */}
-              <EnergyTank memberCount={members.length} weather={weather} />
+              <EnergyTank memberCount={members.length} weather={weather} energyCount={energyCount} />
               {/* 時間帯ラベル */}
               <div className={`hidden sm:block px-2 py-1 rounded-full text-[10px] font-medium ${isNight ? 'bg-slate-700 text-slate-200' : 'bg-amber-50 text-amber-700'}`}>
                 {timeTheme.label}

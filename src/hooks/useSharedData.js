@@ -36,6 +36,8 @@ const DEFAULT_DATA = {
   ],
   scores: {},
   cases: [],
+  // energy: { "2026-04-09": ["user-id-1", "user-id-2"] }
+  energy: {},
 };
 
 function loadLocal() {
@@ -325,6 +327,32 @@ export function useSharedData() {
     return Object.entries(map).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
   }, [data.cases]);
 
+  // === Energy（今日のアクセスユーザー数） ===
+  const energyUsers = (data.energy && data.energy[today]) || [];
+  const energyCount = Array.isArray(energyUsers) ? energyUsers.length : 0;
+
+  // 初回マウント時に自分のIDを登録
+  useEffect(() => {
+    const USER_ID_KEY = 'pikmin-user-id';
+    let uid = localStorage.getItem(USER_ID_KEY);
+    if (!uid) {
+      uid = `u-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      localStorage.setItem(USER_ID_KEY, uid);
+    }
+    // 既に登録済みならスキップ
+    const current = (dataRef.current.energy && dataRef.current.energy[today]) || [];
+    if (Array.isArray(current) && current.includes(uid)) return;
+
+    update((prev) => {
+      const todayUsers = (prev.energy && prev.energy[today]) || [];
+      if (Array.isArray(todayUsers) && todayUsers.includes(uid)) return prev;
+      return {
+        ...prev,
+        energy: { ...prev.energy, [today]: [...(Array.isArray(todayUsers) ? todayUsers : []), uid] },
+      };
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return {
     settings: data.settings,
     updateSettings,
@@ -349,5 +377,6 @@ export function useSharedData() {
     hasToken,
     token,
     updateToken,
+    energyCount,
   };
 }

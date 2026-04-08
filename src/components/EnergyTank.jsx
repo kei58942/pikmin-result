@@ -1,44 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 
-const TANK_KEY = 'pikmin-energy-tank';
-const USER_ID_KEY = 'pikmin-user-id';
-
-// ユニークユーザーIDを生成・取得
-function getUserId() {
-  let id = localStorage.getItem(USER_ID_KEY);
-  if (!id) {
-    id = `u-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    localStorage.setItem(USER_ID_KEY, id);
-  }
-  return id;
-}
-
-// 今日のアクセスユーザーリストをlocalStorageで管理
-function getTodayAccess() {
-  try {
-    const data = JSON.parse(localStorage.getItem(TANK_KEY));
-    const today = new Date().toISOString().slice(0, 10);
-    if (data && data.date === today) return data.users;
-  } catch {}
-  return [];
-}
-
-function recordAccess() {
-  const today = new Date().toISOString().slice(0, 10);
-  const users = getTodayAccess();
-  const uid = getUserId();
-  if (!users.includes(uid)) users.push(uid);
-  localStorage.setItem(TANK_KEY, JSON.stringify({ date: today, users }));
-  return users.length;
-}
-
-export default function EnergyTank({ memberCount, weather }) {
+export default function EnergyTank({ memberCount, weather, energyCount }) {
   const maxCapacity = Math.max(memberCount || 5, 3);
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    setCount(recordAccess());
-  }, []);
+  const count = energyCount || 0;
 
   const fillPercent = Math.min((count / maxCapacity) * 100, 100);
   const isFull = fillPercent >= 80;
