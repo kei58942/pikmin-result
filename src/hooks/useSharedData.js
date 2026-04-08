@@ -12,7 +12,7 @@ const OWNER = 'kei58942';
 const REPO = 'pikmin-data';
 const FILE_PATH = 'data.json';
 const API_URL = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`;
-const POLL_INTERVAL = 5000; // 5秒ポーリング
+// 認証済み: 5秒ポーリング (5000req/hr余裕), 未認証: 60秒 (60req/hr制限)
 
 function getTodayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -69,12 +69,12 @@ function setToken(token) {
   localStorage.setItem(TOKEN_KEY, token);
 }
 
-// GitHub APIからdata.json読み取り（認証不要）
-async function fetchRemote() {
+// GitHub APIからdata.json読み取り（トークンがあれば認証付き）
+async function fetchRemote(token) {
   try {
-    const res = await fetch(`${API_URL}?t=${Date.now()}`, {
-      headers: { Accept: 'application/vnd.github.v3+json' },
-    });
+    const headers = { Accept: 'application/vnd.github.v3+json' };
+    if (token) headers.Authorization = `token ${token}`;
+    const res = await fetch(`${API_URL}?t=${Date.now()}`, { headers });
     if (!res.ok) return null;
     const file = await res.json();
     const content = JSON.parse(decodeURIComponent(escape(atob(file.content))));
@@ -132,8 +132,10 @@ export function useSharedData() {
   useEffect(() => {
     let active = true;
 
+    const pollInterval = token ? 5000 : 55000; // 認証済み5秒, 未認証55秒
+
     const poll = async () => {
-      const result = await fetchRemote();
+      const result = await fetchRemote(token);
       if (!active) return;
 
       if (!result) {
@@ -159,9 +161,9 @@ export function useSharedData() {
     };
 
     poll();
-    const timer = setInterval(poll, POLL_INTERVAL);
+    const timer = setInterval(poll, pollInterval);
     return () => { active = false; clearInterval(timer); };
-  }, []);
+  }, [token]);
 
   // === 書き込み（デバウンス1秒） ===
   const syncToRemote = useCallback((newData) => {
@@ -171,7 +173,7 @@ export function useSharedData() {
     if (writeTimeout.current) clearTimeout(writeTimeout.current);
     writeTimeout.current = setTimeout(async () => {
       // 最新のSHAを取得してから書き込み
-      const latest = await fetchRemote();
+      const latest = await fetchRemote(token);
       if (latest) latestSha.current = latest.sha;
 
       const newSha = await writeRemote(newData, latestSha.current, token);
