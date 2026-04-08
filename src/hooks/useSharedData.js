@@ -52,6 +52,16 @@ function saveLocal(data) {
 }
 
 function getToken() {
+  // URLパラメータ ?token=xxx でトークンを自動設定（1回だけ）
+  const url = new URL(window.location.href);
+  const paramToken = url.searchParams.get('token');
+  if (paramToken) {
+    localStorage.setItem(TOKEN_KEY, paramToken);
+    // URLからトークンを消す（履歴に残さない）
+    url.searchParams.delete('token');
+    window.history.replaceState({}, '', url.toString());
+    return paramToken;
+  }
   return localStorage.getItem(TOKEN_KEY) || '';
 }
 
