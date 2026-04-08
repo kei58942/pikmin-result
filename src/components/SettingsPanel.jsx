@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Settings, UserPlus, Pencil, Trash2, X, Check, Cloud, CloudOff, RefreshCw, GitBranch } from 'lucide-react';
+import { Settings, UserPlus, Pencil, Trash2, X, Check, Wifi, WifiOff } from 'lucide-react';
 
 export default function SettingsPanel({
   settings, updateSettings,
   members, addMember, updateMember, removeMember,
-  gitHubApi, onSyncNow,
+  syncStatus, isFirebaseConfigured,
   onClose,
 }) {
   const [newMemberName, setNewMemberName] = useState('');
@@ -46,71 +46,38 @@ export default function SettingsPanel({
         </div>
 
         <div className="p-6 space-y-6">
-          {/* GitHub 連携 */}
+          {/* 同期ステータス */}
           <section className="p-4 rounded-2xl bg-gray-50 border border-gray-200/50">
-            <div className="flex items-center gap-2 mb-3">
-              <GitBranch className="w-5 h-5 text-gray-800" />
-              <h3 className="text-sm font-bold text-gray-800">GitHub 連携（チーム共有）</h3>
-              {gitHubApi.connected && (
-                <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-bold">接続済</span>
+            <div className="flex items-center gap-2 mb-2">
+              {syncStatus === 'synced' ? (
+                <Wifi className="w-5 h-5 text-green-500" />
+              ) : (
+                <WifiOff className="w-5 h-5 text-gray-400" />
               )}
-              {gitHubApi.syncing && (
-                <RefreshCw className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+              <h3 className="text-sm font-bold text-gray-800">データ同期</h3>
+              {syncStatus === 'synced' && (
+                <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-bold">リアルタイム同期中</span>
               )}
             </div>
-            <p className="text-xs text-gray-500 mb-3">
-              GitHubリポジトリにデータを保存し、チーム全員で共有できます
-            </p>
-
-            <div className="space-y-2">
-              <div>
-                <label className="block text-[11px] font-medium text-gray-500 mb-1">リポジトリオーナー</label>
-                <input
-                  type="text"
-                  value={gitHubApi.config.owner}
-                  onChange={(e) => gitHubApi.updateConfig({ owner: e.target.value.trim() })}
-                  placeholder="例: kanzai-maker"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-green-300"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-gray-500 mb-1">リポジトリ名</label>
-                <input
-                  type="text"
-                  value={gitHubApi.config.repo}
-                  onChange={(e) => gitHubApi.updateConfig({ repo: e.target.value.trim() })}
-                  placeholder="例: pikmin-result"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-green-300"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-gray-500 mb-1">
-                  Personal Access Token
-                  <span className="text-gray-400 ml-1">(repo権限が必要)</span>
-                </label>
-                <input
-                  type="password"
-                  value={gitHubApi.config.token}
-                  onChange={(e) => gitHubApi.updateConfig({ token: e.target.value.trim() })}
-                  placeholder="ghp_xxxxxxxxxxxx"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-300"
-                />
-              </div>
-            </div>
-
-            {gitHubApi.lastError && (
-              <p className="text-xs text-red-500 mt-2">エラー: {gitHubApi.lastError}</p>
+            {syncStatus === 'synced' && (
+              <p className="text-xs text-green-600">
+                Firebase接続済み — 全メンバーのスコアがリアルタイムで同期されています
+              </p>
             )}
-
-            {gitHubApi.isConfigured && (
-              <button
-                onClick={onSyncNow}
-                disabled={gitHubApi.syncing}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold cursor-pointer disabled:opacity-50 mt-3"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${gitHubApi.syncing ? 'animate-spin' : ''}`} />
-                今すぐ同期
-              </button>
+            {syncStatus === 'local' && (
+              <p className="text-xs text-gray-500">
+                ローカルモード — データはこのブラウザにのみ保存されています
+              </p>
+            )}
+            {syncStatus === 'connecting' && (
+              <p className="text-xs text-yellow-600">
+                Firebaseに接続中...
+              </p>
+            )}
+            {syncStatus === 'error' && (
+              <p className="text-xs text-red-500">
+                同期エラー — ページを再読み込みしてください
+              </p>
             )}
           </section>
 

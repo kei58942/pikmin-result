@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Rocket, Settings, Trophy, Zap, CalendarDays, BookOpen, Cloud, CloudOff } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Rocket, Settings, Trophy, Zap, CalendarDays, BookOpen, Cloud, CloudOff, Wifi, WifiOff } from 'lucide-react';
 import ScoreBoard from './components/ScoreBoard';
 import Ranking from './components/Ranking';
 import BestCases from './components/BestCases';
@@ -10,7 +10,6 @@ import { useClickEffect } from './components/ClickEffect';
 import DailyBriefing from './components/DailyBriefing';
 import WeatherOverlay from './components/WeatherOverlay';
 import EnergyTank from './components/EnergyTank';
-import { useGitHubApi } from './hooks/useGitHubApi';
 import { useSharedData } from './hooks/useSharedData';
 
 const TABS = [
@@ -25,38 +24,40 @@ function getTimeTheme() {
     bg: 'from-morning-start via-morning-mid to-morning-end',
     header: 'bg-white/70 border-green-200/50',
     label: '🌅 朝の森',
-    textClass: '',
   };
   if (h >= 11 && h < 16) return {
     bg: 'from-noon-start via-noon-mid to-noon-end',
     header: 'bg-white/70 border-blue-200/50',
     label: '☀️ 昼の草原',
-    textClass: '',
   };
   if (h >= 16 && h < 19) return {
     bg: 'from-evening-start via-evening-mid to-evening-end',
     header: 'bg-orange-50/70 border-orange-200/50',
     label: '🌇 夕焼けの丘',
-    textClass: '',
   };
   return {
     bg: 'from-night-start via-night-mid to-night-end',
     header: 'bg-slate-900/70 border-slate-700/50',
     label: '🌙 夜の探索',
-    textClass: 'text-white',
   };
 }
 
+const SYNC_LABELS = {
+  local: { text: 'ローカル', icon: WifiOff, color: 'bg-gray-100 text-gray-400' },
+  connecting: { text: '接続中...', icon: Wifi, color: 'bg-yellow-50 text-yellow-600' },
+  synced: { text: 'リアルタイム同期', icon: Wifi, color: 'bg-green-50 text-green-600' },
+  error: { text: '同期エラー', icon: WifiOff, color: 'bg-red-50 text-red-500' },
+};
+
 function App() {
-  const gitHubApi = useGitHubApi();
   const {
     settings, updateSettings,
     members, addMember, updateMember, removeMember,
     addPoint, removePoint, getScore, getTotal,
     getDailyRanking, getMonthlyRanking, todayStr, monthStr,
     cases, addCase, removeCase, getMethodStats, getMemberStats,
-    loadFromGitHub,
-  } = useSharedData(gitHubApi);
+    syncStatus, isFirebaseConfigured,
+  } = useSharedData();
 
   const { spawnEffect, EffectLayer } = useClickEffect();
 
@@ -66,12 +67,7 @@ function App() {
   const timeTheme = getTimeTheme();
   const isNight = timeTheme.label.includes('夜');
 
-  // GitHub接続時にデータ取得
-  useEffect(() => {
-    if (gitHubApi.isConfigured) {
-      loadFromGitHub();
-    }
-  }, [gitHubApi.isConfigured]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sync = SYNC_LABELS[syncStatus];
 
   return (
     <div className={`min-h-screen bg-gradient-to-br ${timeTheme.bg} transition-colors duration-1000`}>
@@ -101,17 +97,11 @@ function App() {
               <div className={`hidden sm:block px-2 py-1 rounded-full text-[10px] font-medium ${isNight ? 'bg-slate-700 text-slate-200' : 'bg-amber-50 text-amber-700'}`}>
                 {timeTheme.label}
               </div>
-              {/* 同期ステータスインジケーター */}
-              {gitHubApi.isConfigured && (
-                <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${
-                  gitHubApi.connected
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'bg-gray-100 text-gray-400'
-                }`}>
-                  {gitHubApi.connected ? <Cloud className="w-3 h-3" /> : <CloudOff className="w-3 h-3" />}
-                  {gitHubApi.syncing ? '同期中...' : gitHubApi.connected ? '同期済' : '未接続'}
-                </div>
-              )}
+              {/* 同期ステータス */}
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium ${sync.color}`}>
+                <sync.icon className="w-3 h-3" />
+                <span className="hidden sm:inline">{sync.text}</span>
+              </div>
               <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-50 text-xs text-green-700">
                 <CalendarDays className="w-3.5 h-3.5" />
                 {todayStr}
@@ -223,8 +213,8 @@ function App() {
           addMember={addMember}
           updateMember={updateMember}
           removeMember={removeMember}
-          gitHubApi={gitHubApi}
-          onSyncNow={loadFromGitHub}
+          syncStatus={syncStatus}
+          isFirebaseConfigured={isFirebaseConfigured}
           onClose={() => setShowSettings(false)}
         />
       )}

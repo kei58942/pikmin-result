@@ -1,8 +1,9 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { db, ref, set, onValue, off, isFirebaseConfigured } from '../firebase';
 
 // ============================================================
 // 全データを一元管理するフック
-// ローカル(localStorage)で即時反映 + GitHub APIで共有
+// Firebase Realtime Database でリアルタイム同期
 // ============================================================
 
 const LOCAL_KEY = 'pikmin-all-data';
@@ -44,36 +45,72 @@ function saveLocal(data) {
   localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
 }
 
-export function useSharedData(gitHubApi) {
+export function useSharedData() {
   const [data, setData] = useState(loadLocal);
-  const pendingSave = useRef(false);
+  const [syncStatus, setSyncStatus] = useState(
+    isFirebaseConfigured ? 'connecting' : 'local'
+  ); // 'local' | 'connecting' | 'synced' | 'error'
+  const isRemoteUpdate = useRef(false);
+  const writeTimeout = useRef(null);
 
-  // --- GitHub同期 ---
-  const syncToGitHub = useCallback((newData) => {
-    if (gitHubApi?.isConfigured) {
-      gitHubApi.saveDebounced(newData);
-    }
-  }, [gitHubApi]);
+  // === Firebase リアルタイムリスナー ===
+  useEffect(() => {
+    if (!isFirebaseConfigured || !db) return;
 
-  const loadFromGitHub = useCallback(async () => {
-    if (!gitHubApi?.isConfigured) return;
-    const remote = await gitHubApi.fetchAll();
-    if (remote && remote.members) {
-      const merged = { ...DEFAULT_DATA, ...remote };
-      setData(merged);
-      saveLocal(merged);
-    }
-  }, [gitHubApi]);
+    const dataRef = ref(db, 'pikmin-data');
 
-  // --- 汎用更新 ---
+    const unsubscribe = onValue(
+      dataRef,
+      (snapshot) => {
+        const remote = snapshot.val();
+        if (remote) {
+          const merged = { ...DEFAULT_DATA, ...remote };
+          // cases配列がFirebaseでオブジェクトになることがあるので修正
+          if (remote.cases && !Array.isArray(remote.cases)) {
+            merged.cases = Object.values(remote.cases);
+          }
+          if (remote.members && !Array.isArray(remote.members)) {
+            merged.members = Object.values(remote.members);
+          }
+          isRemoteUpdate.current = true;
+          setData(merged);
+          saveLocal(merged);
+        }
+        setSyncStatus('synced');
+      },
+      (error) => {
+        console.error('Firebase listener error:', error);
+        setSyncStatus('error');
+      }
+    );
+
+    return () => off(dataRef);
+  }, []);
+
+  // === Firebaseへ書き込み（デバウンス付き） ===
+  const writeToFirebase = useCallback((newData) => {
+    if (!isFirebaseConfigured || !db) return;
+
+    if (writeTimeout.current) clearTimeout(writeTimeout.current);
+    writeTimeout.current = setTimeout(() => {
+      const dataRef = ref(db, 'pikmin-data');
+      set(dataRef, newData).catch((err) => {
+        console.error('Firebase write error:', err);
+        setSyncStatus('error');
+      });
+    }, 300); // 300msデバウンス
+  }, []);
+
+  // === 汎用更新（ローカル即時 + Firebase送信） ===
   const update = useCallback((updater) => {
     setData((prev) => {
       const next = updater(prev);
       saveLocal(next);
-      syncToGitHub(next);
+      isRemoteUpdate.current = false;
+      writeToFirebase(next);
       return next;
     });
-  }, [syncToGitHub]);
+  }, [writeToFirebase]);
 
   // === Settings ===
   const updateSettings = useCallback((updates) => {
@@ -105,8 +142,6 @@ export function useSharedData(gitHubApi) {
   // === Scores ===
   const today = getTodayStr();
   const month = getMonthStr();
-
-  const getDayScores = useCallback((date) => data.scores[date] || {}, [data.scores]);
 
   const addPoint = useCallback((memberId, type) => {
     update((prev) => {
@@ -165,7 +200,6 @@ export function useSharedData(gitHubApi) {
   );
 
   const getMonthlyRanking = useCallback(() => {
-    // 今月の全日を合算
     const monthly = {};
     Object.entries(data.scores).forEach(([date, dayScores]) => {
       if (date.startsWith(month)) {
@@ -211,15 +245,12 @@ export function useSharedData(gitHubApi) {
   }, [data.cases]);
 
   return {
-    // settings
     settings: data.settings,
     updateSettings,
-    // members
     members: data.members,
     addMember,
     updateMember,
     removeMember,
-    // scores
     addPoint,
     removePoint,
     getScore,
@@ -228,13 +259,12 @@ export function useSharedData(gitHubApi) {
     getMonthlyRanking,
     todayStr: today,
     monthStr: month,
-    // cases
     cases: data.cases,
     addCase,
     removeCase,
     getMethodStats,
     getMemberStats,
-    // sync
-    loadFromGitHub,
+    syncStatus,
+    isFirebaseConfigured,
   };
 }
