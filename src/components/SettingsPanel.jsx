@@ -4,7 +4,7 @@ import { Settings, UserPlus, Pencil, Trash2, X, Check, Wifi, WifiOff } from 'luc
 export default function SettingsPanel({
   settings, updateSettings,
   members, addMember, updateMember, removeMember,
-  syncStatus, isFirebaseConfigured,
+  syncStatus,
   onClose,
 }) {
   const [newMemberName, setNewMemberName] = useState('');
@@ -61,17 +61,12 @@ export default function SettingsPanel({
             </div>
             {syncStatus === 'synced' && (
               <p className="text-xs text-green-600">
-                Firebase接続済み — 全メンバーのスコアがリアルタイムで同期されています
-              </p>
-            )}
-            {syncStatus === 'local' && (
-              <p className="text-xs text-gray-500">
-                ローカルモード — データはこのブラウザにのみ保存されています
+                クラウド同期中 — 全メンバーのスコアが3秒ごとに自動同期されています
               </p>
             )}
             {syncStatus === 'connecting' && (
               <p className="text-xs text-yellow-600">
-                Firebaseに接続中...
+                サーバーに接続中...
               </p>
             )}
             {syncStatus === 'error' && (

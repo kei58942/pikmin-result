@@ -56,7 +56,7 @@ function App() {
     addPoint, removePoint, getScore, getTotal,
     getDailyRanking, getMonthlyRanking, todayStr, monthStr,
     cases, addCase, removeCase, getMethodStats, getMemberStats,
-    syncStatus, isFirebaseConfigured,
+    syncStatus,
   } = useSharedData();
 
   const { spawnEffect, EffectLayer } = useClickEffect();
@@ -214,7 +214,6 @@ function App() {
           updateMember={updateMember}
           removeMember={removeMember}
           syncStatus={syncStatus}
-          isFirebaseConfigured={isFirebaseConfigured}
           onClose={() => setShowSettings(false)}
         />
       )}

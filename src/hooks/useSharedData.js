@@ -1,12 +1,15 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { db, ref, set, onValue, off, isFirebaseConfigured } from '../firebase';
 
 // ============================================================
 // 全データを一元管理するフック
-// Firebase Realtime Database でリアルタイム同期
+// jsonblob.com で全ユーザー間リアルタイム同期（ポーリング）
+// 設定不要・サインアップ不要・API Key不要
 // ============================================================
 
 const LOCAL_KEY = 'pikmin-all-data';
+const BLOB_ID = '019d6ee9-4479-768f-ae27-edc4f875dfa6';
+const BLOB_URL = `https://jsonblob.com/api/jsonBlob/${BLOB_ID}`;
+const POLL_INTERVAL = 3000; // 3秒ポーリング
 
 function getTodayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -45,72 +48,101 @@ function saveLocal(data) {
   localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
 }
 
+// リモートからデータ取得
+async function fetchRemote() {
+  try {
+    const res = await fetch(BLOB_URL, {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+// リモートへデータ書き込み
+async function writeRemote(data) {
+  try {
+    await fetch(BLOB_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(data),
+    });
+  } catch {
+    // 失敗してもローカルには保存済み
+  }
+}
+
 export function useSharedData() {
   const [data, setData] = useState(loadLocal);
-  const [syncStatus, setSyncStatus] = useState(
-    isFirebaseConfigured ? 'connecting' : 'local'
-  ); // 'local' | 'connecting' | 'synced' | 'error'
-  const isRemoteUpdate = useRef(false);
+  const [syncStatus, setSyncStatus] = useState('connecting');
+  const lastWriteTs = useRef(0);
   const writeTimeout = useRef(null);
+  const dataRef = useRef(data);
+  dataRef.current = data;
 
-  // === Firebase リアルタイムリスナー ===
+  // === ポーリングでリモートの最新データを取得 ===
   useEffect(() => {
-    if (!isFirebaseConfigured || !db) return;
+    let active = true;
 
-    const dataRef = ref(db, 'pikmin-data');
+    const poll = async () => {
+      const remote = await fetchRemote();
+      if (!active) return;
 
-    const unsubscribe = onValue(
-      dataRef,
-      (snapshot) => {
-        const remote = snapshot.val();
-        if (remote) {
-          const merged = { ...DEFAULT_DATA, ...remote };
-          // cases配列がFirebaseでオブジェクトになることがあるので修正
-          if (remote.cases && !Array.isArray(remote.cases)) {
-            merged.cases = Object.values(remote.cases);
-          }
-          if (remote.members && !Array.isArray(remote.members)) {
-            merged.members = Object.values(remote.members);
-          }
-          isRemoteUpdate.current = true;
-          setData(merged);
-          saveLocal(merged);
-        }
+      if (remote && remote.members) {
         setSyncStatus('synced');
-      },
-      (error) => {
-        console.error('Firebase listener error:', error);
-        setSyncStatus('error');
-      }
-    );
 
-    return () => off(dataRef);
+        // 自分の書き込み直後は上書きスキップ（300ms猶予）
+        if (Date.now() - lastWriteTs.current < 500) return;
+
+        const merged = { ...DEFAULT_DATA, ...remote };
+        // 配列がオブジェクトになった場合の安全策
+        if (remote.cases && !Array.isArray(remote.cases)) {
+          merged.cases = Object.values(remote.cases);
+        }
+        if (remote.members && !Array.isArray(remote.members)) {
+          merged.members = Object.values(remote.members);
+        }
+
+        setData(merged);
+        saveLocal(merged);
+      } else {
+        setSyncStatus(remote === null ? 'error' : 'synced');
+      }
+    };
+
+    // 初回即時取得
+    poll();
+
+    // 3秒ごとにポーリング
+    const timer = setInterval(poll, POLL_INTERVAL);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, []);
 
-  // === Firebaseへ書き込み（デバウンス付き） ===
-  const writeToFirebase = useCallback((newData) => {
-    if (!isFirebaseConfigured || !db) return;
-
+  // === リモートへ書き込み（デバウンス300ms） ===
+  const syncToRemote = useCallback((newData) => {
+    lastWriteTs.current = Date.now();
     if (writeTimeout.current) clearTimeout(writeTimeout.current);
     writeTimeout.current = setTimeout(() => {
-      const dataRef = ref(db, 'pikmin-data');
-      set(dataRef, newData).catch((err) => {
-        console.error('Firebase write error:', err);
-        setSyncStatus('error');
-      });
-    }, 300); // 300msデバウンス
+      writeRemote(newData);
+    }, 300);
   }, []);
 
-  // === 汎用更新（ローカル即時 + Firebase送信） ===
+  // === 汎用更新（ローカル即時 + リモート送信） ===
   const update = useCallback((updater) => {
     setData((prev) => {
       const next = updater(prev);
       saveLocal(next);
-      isRemoteUpdate.current = false;
-      writeToFirebase(next);
+      syncToRemote(next);
       return next;
     });
-  }, [writeToFirebase]);
+  }, [syncToRemote]);
 
   // === Settings ===
   const updateSettings = useCallback((updates) => {
@@ -265,6 +297,5 @@ export function useSharedData() {
     getMethodStats,
     getMemberStats,
     syncStatus,
-    isFirebaseConfigured,
   };
 }
