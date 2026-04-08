@@ -2,14 +2,17 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 
 // ============================================================
 // 全データを一元管理するフック
-// jsonblob.com で全ユーザー間リアルタイム同期（ポーリング）
-// 設定不要・サインアップ不要・API Key不要
+// GitHub API (publicリポ) で全ユーザー間同期
+// 読み取り: トークン不要 / 書き込み: PAT必要（設定画面で1回入力）
 // ============================================================
 
 const LOCAL_KEY = 'pikmin-all-data';
-const BLOB_ID = '019d6ee9-4479-768f-ae27-edc4f875dfa6';
-const BLOB_URL = `https://jsonblob.com/api/jsonBlob/${BLOB_ID}`;
-const POLL_INTERVAL = 3000; // 3秒ポーリング
+const TOKEN_KEY = 'pikmin-github-token';
+const OWNER = 'kei58942';
+const REPO = 'pikmin-data';
+const FILE_PATH = 'data.json';
+const API_URL = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`;
+const POLL_INTERVAL = 5000; // 5秒ポーリング
 
 function getTodayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -48,96 +51,127 @@ function saveLocal(data) {
   localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
 }
 
-// リモートからデータ取得
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY) || '';
+}
+
+function setToken(token) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+// GitHub APIからdata.json読み取り（認証不要）
 async function fetchRemote() {
   try {
-    const res = await fetch(BLOB_URL, {
-      headers: { Accept: 'application/json' },
-      cache: 'no-store',
+    const res = await fetch(`${API_URL}?t=${Date.now()}`, {
+      headers: { Accept: 'application/vnd.github.v3+json' },
     });
     if (!res.ok) return null;
-    return await res.json();
+    const file = await res.json();
+    const content = JSON.parse(decodeURIComponent(escape(atob(file.content))));
+    return { data: content, sha: file.sha };
   } catch {
     return null;
   }
 }
 
-// リモートへデータ書き込み
-async function writeRemote(data) {
+// GitHub APIへdata.json書き込み（PAT必要）
+async function writeRemote(data, sha, token) {
+  if (!token) return null;
   try {
-    await fetch(BLOB_URL, {
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+    const res = await fetch(API_URL, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(data),
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: `update ${new Date().toISOString().slice(0, 16)}`,
+        content,
+        sha,
+      }),
     });
+    if (!res.ok) return null;
+    const result = await res.json();
+    return result.content.sha;
   } catch {
-    // 失敗してもローカルには保存済み
+    return null;
   }
 }
 
 export function useSharedData() {
   const [data, setData] = useState(loadLocal);
   const [syncStatus, setSyncStatus] = useState('connecting');
+  const [token, _setToken] = useState(getToken);
+  const latestSha = useRef(null);
   const lastWriteTs = useRef(0);
   const writeTimeout = useRef(null);
   const dataRef = useRef(data);
   dataRef.current = data;
 
-  // === ポーリングでリモートの最新データを取得 ===
+  const hasToken = !!token;
+
+  const updateToken = useCallback((newToken) => {
+    const trimmed = newToken.trim();
+    setToken(trimmed);
+    _setToken(trimmed);
+  }, []);
+
+  // === ポーリング ===
   useEffect(() => {
     let active = true;
 
     const poll = async () => {
-      const remote = await fetchRemote();
+      const result = await fetchRemote();
       if (!active) return;
 
-      if (remote === null) {
+      if (!result) {
         setSyncStatus('error');
         return;
       }
 
       setSyncStatus('synced');
+      latestSha.current = result.sha;
 
-      // メンバーデータが無い or 文字化け → ローカルデータで上書き修復
-      if (!remote.members || !Array.isArray(remote.members) || remote.members.length === 0) {
-        writeRemote(dataRef.current);
-        return;
+      // 自分の書き込み直後はスキップ
+      if (Date.now() - lastWriteTs.current < 2000) return;
+
+      const remote = result.data;
+      if (remote && remote.members && Array.isArray(remote.members)) {
+        const merged = { ...DEFAULT_DATA, ...remote };
+        if (remote.cases && !Array.isArray(remote.cases)) {
+          merged.cases = Object.values(remote.cases);
+        }
+        setData(merged);
+        saveLocal(merged);
       }
-
-      // 自分の書き込み直後は上書きスキップ
-      if (Date.now() - lastWriteTs.current < 500) return;
-
-      const merged = { ...DEFAULT_DATA, ...remote };
-      if (remote.cases && !Array.isArray(remote.cases)) {
-        merged.cases = Object.values(remote.cases);
-      }
-
-      setData(merged);
-      saveLocal(merged);
     };
 
-    // 初回即時取得
     poll();
-
-    // 3秒ごとにポーリング
     const timer = setInterval(poll, POLL_INTERVAL);
-
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
+    return () => { active = false; clearInterval(timer); };
   }, []);
 
-  // === リモートへ書き込み（デバウンス300ms） ===
+  // === 書き込み（デバウンス1秒） ===
   const syncToRemote = useCallback((newData) => {
+    if (!token) return;
     lastWriteTs.current = Date.now();
-    if (writeTimeout.current) clearTimeout(writeTimeout.current);
-    writeTimeout.current = setTimeout(() => {
-      writeRemote(newData);
-    }, 300);
-  }, []);
 
-  // === 汎用更新（ローカル即時 + リモート送信） ===
+    if (writeTimeout.current) clearTimeout(writeTimeout.current);
+    writeTimeout.current = setTimeout(async () => {
+      // 最新のSHAを取得してから書き込み
+      const latest = await fetchRemote();
+      if (latest) latestSha.current = latest.sha;
+
+      const newSha = await writeRemote(newData, latestSha.current, token);
+      if (newSha) {
+        latestSha.current = newSha;
+      }
+    }, 1000);
+  }, [token]);
+
+  // === 汎用更新 ===
   const update = useCallback((updater) => {
     setData((prev) => {
       const next = updater(prev);
@@ -300,5 +334,8 @@ export function useSharedData() {
     getMethodStats,
     getMemberStats,
     syncStatus,
+    hasToken,
+    token,
+    updateToken,
   };
 }

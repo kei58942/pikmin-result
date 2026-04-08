@@ -56,7 +56,7 @@ function App() {
     addPoint, removePoint, getScore, getTotal,
     getDailyRanking, getMonthlyRanking, todayStr, monthStr,
     cases, addCase, removeCase, getMethodStats, getMemberStats,
-    syncStatus,
+    syncStatus, hasToken, token, updateToken,
   } = useSharedData();
 
   const { spawnEffect, EffectLayer } = useClickEffect();
@@ -214,6 +214,9 @@ function App() {
           updateMember={updateMember}
           removeMember={removeMember}
           syncStatus={syncStatus}
+          hasToken={hasToken}
+          token={token}
+          updateToken={updateToken}
           onClose={() => setShowSettings(false)}
         />
       )}

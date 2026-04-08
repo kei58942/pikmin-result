@@ -4,7 +4,7 @@ import { Settings, UserPlus, Pencil, Trash2, X, Check, Wifi, WifiOff } from 'luc
 export default function SettingsPanel({
   settings, updateSettings,
   members, addMember, updateMember, removeMember,
-  syncStatus,
+  syncStatus, hasToken, token, updateToken,
   onClose,
 }) {
   const [newMemberName, setNewMemberName] = useState('');
@@ -61,12 +61,12 @@ export default function SettingsPanel({
             </div>
             {syncStatus === 'synced' && (
               <p className="text-xs text-green-600">
-                クラウド同期中 — 全メンバーのスコアが3秒ごとに自動同期されています
+                GitHub同期中 — 全メンバーのスコアが5秒ごとに自動同期されています
               </p>
             )}
             {syncStatus === 'connecting' && (
               <p className="text-xs text-yellow-600">
-                サーバーに接続中...
+                GitHubに接続中...
               </p>
             )}
             {syncStatus === 'error' && (
@@ -74,6 +74,25 @@ export default function SettingsPanel({
                 同期エラー — ページを再読み込みしてください
               </p>
             )}
+
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <label className="block text-[11px] font-medium text-gray-500 mb-1">
+                書き込み用トークン
+                <span className="text-gray-400 ml-1">（管理者のみ設定）</span>
+              </label>
+              <input
+                type="password"
+                value={token}
+                onChange={(e) => updateToken(e.target.value)}
+                placeholder="ghp_xxxxxxxxxxxx"
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-300"
+              />
+              {hasToken ? (
+                <p className="text-[10px] text-green-600 mt-1">設定済み — スコア更新がGitHubに保存されます</p>
+              ) : (
+                <p className="text-[10px] text-gray-400 mt-1">未設定でもスコアの閲覧は可能です（読み取り専用）</p>
+              )}
+            </div>
           </section>
 
           {/* ダッシュボード名 */}
